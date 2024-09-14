@@ -6,4 +6,4 @@
 -> cd build \
 -> cmake .. \
 -> make \
--> ./snn\_cuda \
+-> ./snn\_cuda 
