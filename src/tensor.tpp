@@ -406,7 +406,14 @@ Tensor<T> Tensor<T>::operator/=(const float scalar){
 	return result;
 }
 
-
+template<typename T>
+Tensor<T> Tensor<T>::randn(const std::vector<size_t>& shape){
+	Tensor<T> result(shape);
+	fillRandom(result, result.size());
+	cudaDeviceSynchronize();
+	cudaMemcpy(result.data(), result.device_data(), result.size() * sizeof(T), cudaMemcpyDeviceToHost);
+	return result;
+} 
 
 template class Tensor<float>;
 

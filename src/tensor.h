@@ -1,5 +1,4 @@
 #pragma once
-
 #include <vector>
 #include <iostream>
 #include <cuda_runtime.h>
@@ -33,6 +32,7 @@ public:
 	const T& operator[](size_t) const;
 	T& operator()(size_t i, size_t j);
 	const T& operator()(size_t i, size_t j) const;
+	
 	template<typename U>
 	friend std::ostream& operator<<(std::ostream& os, const Tensor<U>& out);	
 	
@@ -60,6 +60,10 @@ public:
 
 	Tensor<T> operator/=(const Tensor<T>& other);
 	Tensor<T> operator/=(const float scalar);
+
+	static Tensor<T> randn(const std::vector<size_t>& shape);
+
+
 private:
 	void allocateMemory();
 	void freeMemory();

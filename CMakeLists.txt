@@ -30,7 +30,6 @@ set_target_properties(snn_cuda PROPERTIES
 
 # Specify CUDA architectures
 if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
-    # Set the architectures you want to support
     set_property(TARGET snn_cuda PROPERTY CUDA_ARCHITECTURES 52 60 61 70 75 80 86)
 else()
     # For older CMake versions
@@ -43,6 +42,7 @@ find_package(CUDAToolkit REQUIRED)
 # Link necessary CUDA libraries
 target_link_libraries(snn_cuda
     PRIVATE
+    curand
 )
 # Optionally, add tests
 # enable_testing()

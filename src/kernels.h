@@ -27,6 +27,9 @@ __global__ void divS(const T* a, T* result, const float scalar, size_t size);
 
 
 template<typename T>
+__global__ void randN(T* a, const size_t size, unsigned long long seed); 
+
+template<typename T>
 void addTwoTensors(const Tensor<T>& tensor1, const Tensor<T>& tensor2, Tensor<T>& tensor3);
 
 template<typename T>
@@ -49,3 +52,6 @@ void mulScalar(const Tensor<T>& tensor1, Tensor<T>& tensor3, const float scalar)
 
 template<typename T>
 void divScalar(const Tensor<T>& tensor1, Tensor<T>& tensor3, const float scalar); 
+
+template<typename T>
+void fillRandom(Tensor<T>& tensor1, const size_t size);

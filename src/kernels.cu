@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <iomanip>
-
+#include <curand_kernel.h>
 #include "tensor.h"
 #include "kernels.h"
 
@@ -231,3 +231,24 @@ void divScalar(const Tensor<T>& tensor1, Tensor<T>& tensor3, const float scalar)
 	}
 }	
 
+
+__global__ void randN(float *a, const size_t size, unsigned long long seed){
+	int index = threadIdx.x + blockIdx.x * blockDim.x;
+	if(index < size){
+		curandState state;
+		curand_init(seed, index, 0, &state);
+		a[index] = curand_uniform(&state);
+	}
+}
+
+template<typename T>
+void fillRandom(Tensor<T>& tensor1, const size_t size){
+	dim3 tpb(16, 16);
+	dim3 bpg((size + tpb.x - 1) / tpb.x, (size + tpb.y - 1) / tpb.y);
+
+	randN<<<bpg, tpb>>>(tensor1.device_data(), size, time(NULL));
+	cudaError_t err = cudaGetLastError();
+	if(err != cudaSuccess){
+		throw std::runtime_error("CUDA randN kernel launch failed.");
+	}
+}

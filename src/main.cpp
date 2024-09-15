@@ -15,11 +15,12 @@ int main(){
 		tensor.toDevice();
 		tensor2.toDevice();
 
-		Tensor<float> result = tensor * tensor2;
-		tensor = tensor2 / 3.0;
-			
+		
+		std::vector<size_t> shape = {4,4};
+		Tensor<float> result = Tensor<float>::randn({2,2});
+
 		data = result.data();
-		std::cout << (result*result + result) << std::endl << tensor << std::endl << tensor2;		
+		std::cout << result << std::endl << tensor << std::endl << tensor2;		
 		std::cout << std::endl;
 	}catch(const std::exception& ex){
 		std::cerr << "Error: " << ex.what() << std::endl;
