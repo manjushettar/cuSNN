@@ -273,7 +273,7 @@ __global__ void randN(T *a, const size_t size, unsigned long long seed){
 	if(index < size){
 		curandState state;
 		curand_init(seed, index, 0, &state);
-		a[index] = curand_uniform(&state);
+		a[index] = curand_normal(&state) * sqrtf(2.f/(size/2));
 	}
 }
 
@@ -303,6 +303,17 @@ __global__ void forwardP(const T* in, const T* weights, const T* bias, T *out, c
 }
 
 template<typename T>
+__global__ void relu(const T* in, T* out, const size_t m, const size_t n){
+	size_t row = threadIdx.y + blockDim.y * blockIdx.y;
+	size_t col = threadIdx.x + blockDim.x * blockIdx.x;
+
+	if(row < m && col < n){
+		if(in[row * n + col] <= 0) out[row * n + col] = 0;
+		else out[row * n + col] = in[row * n + col];
+	}
+}
+
+template<typename T>
 void forwardCall(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, Tensor<T>& out){
 	size_t in_m, in_k;
 	size_t w_k, w_n;
@@ -318,6 +329,23 @@ void forwardCall(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>&
 	dim3 bpg( (w_n + tpb.x - 1) / tpb.x, (in_m + tpb.y - 1) / tpb.y);
 
 	forwardP<<<bpg, tpb>>>(in.device_data(), weights.device_data(), bias.device_data(), out.device_data(), in_m, in_k, w_n);
+	cudaError_t err = cudaGetLastError();
+	if(err != cudaSuccess){
+		std::cerr << "CUDA ERR: " << cudaGetErrorString(err) << std::endl;
+		throw std::runtime_error("forward kernel failed");
+	}
+}
+
+template<typename T>
+void reluCall(const Tensor<T>& in, Tensor<T>& out){
+	const size_t in_m = in.shape()[0];
+	const size_t in_n = in.shape()[1];
+	
+	dim3 tpb(16,16);
+	dim3 bpg((in_n + tpb.x - 1) / tpb.x, (in_m + tpb.y - 1) / tpb.y);
+	
+	relu<<<bpg, tpb>>>(in.device_data(), out.device_data(), in_m, in_n);
+
 	cudaError_t err = cudaGetLastError();
 	if(err != cudaSuccess){
 		std::cerr << "CUDA ERR: " << cudaGetErrorString(err) << std::endl;

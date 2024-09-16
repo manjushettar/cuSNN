@@ -458,6 +458,18 @@ Tensor<T> Tensor<T>::forwardPass(const Tensor<T>& in, const Tensor<T>& weights, 
 	return result;
 } 
 
+template<typename T>
+Tensor<T> Tensor<T>::relu(Tensor<T>& in){
+	Tensor<T> result(in.shape());
+	if(in.device_data_){
+		reluCall(in, result);
+		cudaDeviceSynchronize();
+		cudaMemcpy(result.host_data_, result.device_data_, result.shape()[0] * result.shape()[1] * sizeof(T), cudaMemcpyDeviceToHost);
+	}
+	return result;
+}
+
+
 template class Tensor<float>;
 
 

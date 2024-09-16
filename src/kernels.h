@@ -66,3 +66,9 @@ __global__ void forwardP(const T* in, const T* weights, const T* bias, T* out, c
 
 template<typename T>
 void forwardCall(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, Tensor<T>& out);
+
+template<typename T>
+__global__ void relu(const T* in, T* out, const size_t m, const size_t n);
+
+template<typename T>
+void reluCall(const Tensor<T>& in, Tensor<T>& out);
