@@ -14,14 +14,16 @@ int main(){
 		}
 		tensor.toDevice();
 		tensor2.toDevice();
-
+		
 		
 		std::vector<size_t> shape = {4,4};
-		Tensor<float> result = Tensor<float>::randn({2,2});
+		Tensor<float> in = Tensor<float>::randn({100,20});
+		Tensor<float> weights = Tensor<float>::randn({20, 70});
+		Tensor<float> biases = Tensor<float>::randn({100,1});
 
-		data = result.data();
-		std::cout << result << std::endl << tensor << std::endl << tensor2;		
-		std::cout << std::endl;
+		Tensor<float> res({100,70}); 
+		res = Tensor<float>::forwardPass(in, weights, biases);
+		std::cout << res << res.shape()[0] << res.shape()[1] << std::endl;	
 	}catch(const std::exception& ex){
 		std::cerr << "Error: " << ex.what() << std::endl;
 		return EXIT_FAILURE;

@@ -60,9 +60,9 @@ public:
 
 	Tensor<T> operator/=(const Tensor<T>& other);
 	Tensor<T> operator/=(const float scalar);
-
-	static Tensor<T> randn(const std::vector<size_t>& shape);
-
+	
+	static Tensor<T> forwardPass(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias);
+	static Tensor<T> randn(const std::vector<size_t>& shape);	
 
 private:
 	void allocateMemory();

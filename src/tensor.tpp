@@ -184,6 +184,21 @@ std::ostream& operator<<(std::ostream& os, const Tensor<T>& out){
 
 template<typename T>
 Tensor<T> Tensor<T>::operator+(const Tensor<T>& other){
+	size_t m, k, n;
+	m = shape_[0];
+	k = shape_[1];
+	n = other.shape_[1];
+	
+	if(m == other.shape_[0] && k != n){
+		Tensor<T> result(shape_);
+		if(this->device_data_ && other.device_data_){
+			addTensorAndVector(*this, other, result);
+			cudaDeviceSynchronize();
+			cudaMemcpy(result.host_data_, result.device_data_, m * k * sizeof(T), cudaMemcpyDeviceToHost);
+		}
+		return result;
+	}
+	
 	if(size_ != other.size_){
 		throw std::out_of_range("Tensor values do not line up.");
 	}
@@ -241,18 +256,21 @@ Tensor<T> Tensor<T>::operator-(const float scalar){
 
 template<typename T>
 Tensor<T> Tensor<T>::operator*(const Tensor<T>& other){
-	if(size_ != other.size_){
-		throw std::out_of_range("Tensor values do not line up.");
-	}	
-	Tensor<T> result(shape_);
+	size_t m, n, k;
+	m = shape_[0];
+	n = other.shape_[1];
+	k = other.shape_[0];
+	
+	if(k != shape_[1]){
+		throw std::runtime_error("Invalid mm sizes.");
+	}
+	Tensor<T> result({m, n});
 	if(this->device_data_ && other.device_data_){
 		mulTwoTensors(*this, other, result);
 		cudaDeviceSynchronize();
-		cudaMemcpy(result.host_data_, result.device_data_, size_ * sizeof(T), cudaMemcpyDeviceToHost);
+		cudaMemcpy(result.host_data_, result.device_data_, m * n * sizeof(T), cudaMemcpyDeviceToHost);
 	}
 	return result;
-
-
 }
 
 
@@ -412,6 +430,31 @@ Tensor<T> Tensor<T>::randn(const std::vector<size_t>& shape){
 	fillRandom(result, result.size());
 	cudaDeviceSynchronize();
 	cudaMemcpy(result.data(), result.device_data(), result.size() * sizeof(T), cudaMemcpyDeviceToHost);
+	return result;
+} 
+
+template<typename T>
+Tensor<T> Tensor<T>::forwardPass(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias){
+	size_t in_m, in_k;
+	in_m = in.shape()[0];
+	in_k = in.shape()[1];
+	
+	size_t weights_k, weights_n;
+	weights_k = weights.shape()[0];
+	weights_n = weights.shape()[1];
+	
+	size_t bias_m;
+	bias_m = bias.shape()[0];
+
+	if(in_k != weights_k) throw std::runtime_error("bad forward in/weights");
+	if(bias_m != in_m) throw std::runtime_error("bad forward bias");
+	
+	Tensor<T> result({in_m, weights_n});
+	if(in.device_data_ && weights.device_data_ && bias.device_data_){
+		forwardCall(in, weights, bias, result);
+		cudaDeviceSynchronize();
+		cudaMemcpy(result.host_data_, result.device_data_, in_m * weights_n * sizeof(T), cudaMemcpyDeviceToHost); 
+	}
 	return result;
 } 
 

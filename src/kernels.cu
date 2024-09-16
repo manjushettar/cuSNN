@@ -24,14 +24,6 @@ __global__ void subT(const T* a, const T* b, T* result, size_t size){
 	}
 }
 
-template<typename T>
-__global__ void mulT(const T* a, const T* b, T* result, size_t size){
-	size_t index = threadIdx.x + blockDim.x * blockIdx.x;
-	if(index < size){
-		result[index] = a[index] * b[index];
-	}
-}
-
 
 template<typename T>
 __global__ void divT(const T* a, const T* b, T* result, size_t size){
@@ -120,18 +112,62 @@ void subTwoTensors(const Tensor<T>& tensor1, const Tensor<T>& tensor2, Tensor<T>
 
 
 template<typename T>
-void mulTwoTensors(const Tensor<T>& tensor1, const Tensor<T>& tensor2, Tensor<T>& tensor3){
-	size_t size1 = tensor1.size();
-	size_t size2 = tensor2.size();
-	size_t size3 = tensor3.size();
-	if(size1 != size2 && size1 != size3){
-		throw std::runtime_error("Invalid sizes for subtract tensors");
+__global__ void mulT(const T* a, const T* b, T* result, size_t m, size_t n, size_t k){
+	size_t row = threadIdx.y + blockDim.y * blockIdx.y;
+	size_t col = threadIdx.x + blockDim.x * blockIdx.x;
+	if(row < m && col < n){
+		T dotProd = 0;
+		for(int i = 0; i < k; i++){
+			dotProd += a[row * k + i] * b[i * n + col];
+		}
+		result[row * n + col] = dotProd;
 	}
-	dim3 tpb(16, 16);
-	dim3 bpg((size3 + tpb.x - 1) / tpb.x, (size3 + tpb.y - 1) / tpb.y);
+}
 
+
+template<typename T>
+__global__ void addTV(const T* a, const T* b, T* result, size_t m, size_t n, size_t k){
+	size_t col = threadIdx.x + blockDim.x * blockIdx.x;
+	size_t row = threadIdx.y + blockDim.y * blockIdx.y;
+		
+	if(row < m && col < k){
+		result[row * k + col] = a[row * k + col] + b[row];
+	}
+}
+
+template<typename T>
+void addTensorAndVector(const Tensor<T>& tensor1, const Tensor<T>& vector1, Tensor<T>& tensor3){
+	size_t m, k, n;
+	m = tensor1.shape()[0];
+	k = tensor1.shape()[1];
+	n = vector1.shape()[1];
+	if(n != 1) throw std::runtime_error("Matrix-vector adding broadcasting issue.");
 	
-	mulT<<<bpg, tpb>>>(tensor1.device_data(), tensor2.device_data(), tensor3.device_data(), size3);
+	if(m != tensor3.shape()[0] || k != tensor3.shape()[1]) throw std::runtime_error("Result tensor shape mismatch.");
+
+	dim3 tpb(16, 16);
+	dim3 bpg((k + tpb.x - 1) / tpb.x, (m + tpb.y - 1) / tpb.y);
+	addTV<<<bpg, tpb>>>(tensor1.device_data(), vector1.device_data(), tensor3.device_data(), m, n, k);
+	cudaError_t err = cudaGetLastError();
+	if(err != cudaSuccess){
+		throw std::runtime_error("CUDA tensor x vector failed.");
+	}
+}
+
+
+template<typename T>
+void mulTwoTensors(const Tensor<T>& tensor1, const Tensor<T>& tensor2, Tensor<T>& tensor3){
+	size_t m, k, n;
+	m = tensor1.shape()[0];
+	n = tensor2.shape()[1];
+	k = tensor1.shape()[1];
+	
+	if(k != tensor2.shape()[0]) throw std::runtime_error("Matrix dim do not match - k value.");
+	if(m != tensor3.shape()[0] || n != tensor3.shape()[1]) throw std::runtime_error("Result matrix dims are off");
+	dim3 tpb(16, 16);
+	dim3 bpg((n + tpb.x - 1) / tpb.x, (m + tpb.y - 1) / tpb.y);
+
+	mulT<<<bpg, tpb>>>(tensor1.device_data(), tensor2.device_data(), tensor3.device_data(), m, n, k);
 	
 	cudaError_t err = cudaGetLastError();
 	if(err != cudaSuccess){
@@ -231,8 +267,8 @@ void divScalar(const Tensor<T>& tensor1, Tensor<T>& tensor3, const float scalar)
 	}
 }	
 
-
-__global__ void randN(float *a, const size_t size, unsigned long long seed){
+template<typename T>
+__global__ void randN(T *a, const size_t size, unsigned long long seed){
 	int index = threadIdx.x + blockIdx.x * blockDim.x;
 	if(index < size){
 		curandState state;
@@ -243,12 +279,49 @@ __global__ void randN(float *a, const size_t size, unsigned long long seed){
 
 template<typename T>
 void fillRandom(Tensor<T>& tensor1, const size_t size){
-	dim3 tpb(16, 16);
-	dim3 bpg((size + tpb.x - 1) / tpb.x, (size + tpb.y - 1) / tpb.y);
+	dim3 tpb(256);
+	dim3 bpg((size + tpb.x - 1) / tpb.x);
 
 	randN<<<bpg, tpb>>>(tensor1.device_data(), size, time(NULL));
 	cudaError_t err = cudaGetLastError();
 	if(err != cudaSuccess){
 		throw std::runtime_error("CUDA randN kernel launch failed.");
+	}
+}
+
+template<typename T>
+__global__ void forward(const T* in, const T* weights, const T* bias, T *out, const size_t m, const size_t k, const size_t n){
+	size_t col = threadIdx.x + blockDim.x * blockIdx.x;
+	size_t row = threadIdx.y + blockDim.y * blockIdx.y;
+
+	if(row < m && col < n){
+		T dotProd = 0.f;
+		for(size_t i = 0; i < k; i++){
+			dotProd += in[row * k + i] * weights[n * i + col];
+		}
+		out[row * n + col] = dotProd + bias[row];
+	}
+}
+
+template<typename T>
+void forwardCall(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, Tensor<T>& out){
+	size_t in_m, in_k;
+	size_t w_k, w_n;
+	in_m = in.shape()[0];
+	in_k = in.shape()[1];
+	w_k = weights.shape()[0];
+	w_n = weights.shape()[1];
+	
+	size_t bias_m = bias.shape()[0];
+	size_t bias_k = bias.shape()[1];
+
+	dim3 tpb(16, 16);
+	dim3 bpg( (w_n + tpb.x - 1) / tpb.x, (in_m + tpb.y - 1) / tpb.y);
+
+	forward<<<bpg, tpb>>>(in.device_data(), weights.device_data(), bias.device_data(), out.device_data(), in_m, in_k, w_n);
+	cudaError_t err = cudaGetLastError();
+	if(err != cudaSuccess){
+		std::cerr << "CUDA ERR: " << cudaGetErrorString(err) << std::endl;
+		throw std::runtime_error("forward kernel failed");
 	}
 }

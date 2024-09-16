@@ -8,7 +8,7 @@ template<typename T>
 __global__ void subT(const T* a, const T* b, T* result, size_t size);
 
 template<typename T>
-__global__ void mulT(const T* a, const T* b, T* result, size_t size);
+__global__ void mulT(const T* a, const T* b, T* result, size_t m, size_t n, size_t k);
 
 template<typename T>
 __global__ void divT(const T* a, const T* b, T* result, size_t size);
@@ -25,6 +25,8 @@ __global__ void mulS(const T* a, T* result, const float scalar, size_t size);
 template<typename T>
 __global__ void divS(const T* a, T* result, const float scalar, size_t size);
 
+template<typename T>
+__global__ void addTV(const T* a, const T* b, T* result, size_t m, size_t n, size_t k);
 
 template<typename T>
 __global__ void randN(T* a, const size_t size, unsigned long long seed); 
@@ -55,3 +57,12 @@ void divScalar(const Tensor<T>& tensor1, Tensor<T>& tensor3, const float scalar)
 
 template<typename T>
 void fillRandom(Tensor<T>& tensor1, const size_t size);
+
+template<typename T>
+void addTensorAndVector(const Tensor<T>& tensor1, const Tensor<T>& vector1, Tensor<T>& tensor3);
+
+template<typename T>
+__global__ void forward(const T* in, const T* weights, const T* bias, T* out, size_t m, size_t k, size_t n);
+
+template<typename T>
+void forwardCall(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, Tensor<T>& out);
