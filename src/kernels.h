@@ -62,7 +62,7 @@ template<typename T>
 void addTensorAndVector(const Tensor<T>& tensor1, const Tensor<T>& vector1, Tensor<T>& tensor3);
 
 template<typename T>
-__global__ void forward(const T* in, const T* weights, const T* bias, T* out, size_t m, size_t k, size_t n);
+__global__ void forwardP(const T* in, const T* weights, const T* bias, T* out, const size_t m, const size_t k, const size_t n);
 
 template<typename T>
 void forwardCall(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, Tensor<T>& out);

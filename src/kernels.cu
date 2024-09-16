@@ -290,10 +290,9 @@ void fillRandom(Tensor<T>& tensor1, const size_t size){
 }
 
 template<typename T>
-__global__ void forward(const T* in, const T* weights, const T* bias, T *out, const size_t m, const size_t k, const size_t n){
+__global__ void forwardP(const T* in, const T* weights, const T* bias, T *out, const size_t m, const size_t k, const size_t n){
 	size_t col = threadIdx.x + blockDim.x * blockIdx.x;
 	size_t row = threadIdx.y + blockDim.y * blockIdx.y;
-
 	if(row < m && col < n){
 		T dotProd = 0.f;
 		for(size_t i = 0; i < k; i++){
@@ -318,7 +317,7 @@ void forwardCall(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>&
 	dim3 tpb(16, 16);
 	dim3 bpg( (w_n + tpb.x - 1) / tpb.x, (in_m + tpb.y - 1) / tpb.y);
 
-	forward<<<bpg, tpb>>>(in.device_data(), weights.device_data(), bias.device_data(), out.device_data(), in_m, in_k, w_n);
+	forwardP<<<bpg, tpb>>>(in.device_data(), weights.device_data(), bias.device_data(), out.device_data(), in_m, in_k, w_n);
 	cudaError_t err = cudaGetLastError();
 	if(err != cudaSuccess){
 		std::cerr << "CUDA ERR: " << cudaGetErrorString(err) << std::endl;
