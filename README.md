@@ -5,7 +5,7 @@ Tensor<float> weights({k,n})\
 Tensor<float> bias({m, 1})\
 
 Tensor<float> res = Tensor<float>::forwardPass(in, weights, bias);
-
+res = Tensor<float>::relu(res);
 -> git clone \
 -> cd cuSNN \
 -> mkdir build \
