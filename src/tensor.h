@@ -60,9 +60,12 @@ public:
 
 	Tensor<T> operator/=(const Tensor<T>& other);
 	Tensor<T> operator/=(const float scalar);
-
-	static Tensor<T> relu(Tensor<T>& in);	
+	
+	static Tensor<T> relu(const Tensor<T>& in);	
 	static Tensor<T> forwardPass(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias);
+	static Tensor<T> softmax(const Tensor<T>& in);
+	static Tensor<T> tanh(const Tensor<T>& in);
+
 	static Tensor<T> randn(const std::vector<size_t>& shape);	
 
 private:

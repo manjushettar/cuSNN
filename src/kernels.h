@@ -72,3 +72,15 @@ __global__ void relu(const T* in, T* out, const size_t m, const size_t n);
 
 template<typename T>
 void reluCall(const Tensor<T>& in, Tensor<T>& out);
+
+template<typename T>
+__global__ void tanh(const T* in, T* out, const size_t m, const size_t n);
+
+template<typename T>
+void tanhCall(const Tensor<T>& in, Tensor<T>& out);
+
+template<typename T>
+__global__ void softmax(const T* in, T* out , const size_t m, const size_t n);
+
+template<typename T>
+void softmaxCall(const Tensor<T>& in, Tensor<T>& out);

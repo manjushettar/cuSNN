@@ -459,7 +459,7 @@ Tensor<T> Tensor<T>::forwardPass(const Tensor<T>& in, const Tensor<T>& weights, 
 } 
 
 template<typename T>
-Tensor<T> Tensor<T>::relu(Tensor<T>& in){
+Tensor<T> Tensor<T>::relu(const Tensor<T>& in){
 	Tensor<T> result(in.shape());
 	if(in.device_data_){
 		reluCall(in, result);
@@ -469,6 +469,27 @@ Tensor<T> Tensor<T>::relu(Tensor<T>& in){
 	return result;
 }
 
+template<typename T>
+Tensor<T> Tensor<T>::softmax(const Tensor<T>& in){
+	Tensor<T> result(in.shape());
+	if(in.device_data_){
+		softmaxCall(in, result);
+		cudaDeviceSynchronize();
+		cudaMemcpy(result.host_data_, result.device_data_, result.shape()[0] * result.shape()[1] * sizeof(T), cudaMemcpyDeviceToHost);
+	}
+	return result;
+}
+
+template<typename T>
+Tensor<T> Tensor<T>::tanh(const Tensor<T>& in){
+	Tensor<T> result(in.shape());
+	if(in.device_data_){
+		tanhCall(in, result);
+		cudaDeviceSynchronize();
+		cudaMemcpy(result.host_data_, result.device_data_, result.shape()[0] * result.shape()[1] * sizeof(T), cudaMemcpyDeviceToHost);
+	}
+	return result;
+}
 
 template class Tensor<float>;
 

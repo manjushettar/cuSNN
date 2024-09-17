@@ -352,3 +352,67 @@ void reluCall(const Tensor<T>& in, Tensor<T>& out){
 		throw std::runtime_error("forward kernel failed");
 	}
 }
+
+template<typename T>
+__global__ void tanh(const T* in, T* out, const size_t m, const size_t n){
+	size_t row = threadIdx.y + blockDim.y * blockIdx.y;
+	size_t col = threadIdx.x + blockDim.x * blockIdx.x;
+
+	if(row < m && col < n){
+		T val = in[row * n + col];
+		T numerator = (exp(val) - exp(-1.0 * val));
+		T denominator = (exp(val) + exp(-1.0 * val));
+
+		out[row * n + col] = numerator / denominator;
+	}
+}
+
+
+
+template<typename T>
+void tanhCall(const Tensor<T>& in, Tensor<T>& out){
+	const size_t in_m = in.shape()[0];
+	const size_t in_n = in.shape()[1];
+	
+	dim3 tpb(16,16);
+	dim3 bpg((in_n + tpb.x - 1) / tpb.x, (in_m + tpb.y - 1) / tpb.y);
+	
+	tanh<<<bpg, tpb>>>(in.device_data(), out.device_data(), in_m, in_n);
+
+	cudaError_t err = cudaGetLastError();
+	if(err != cudaSuccess){
+		std::cerr << "CUDA ERR: " << cudaGetErrorString(err) << std::endl;
+		throw std::runtime_error("forward kernel failed");
+	}
+}
+template<typename T>
+__global__ void softmax(const T* in, T* out , const size_t m, const size_t n){
+	size_t row = threadIdx.y + blockDim.y * blockIdx.y;
+	size_t col = threadIdx.x + blockDim.x * blockIdx.x;
+	if(row < m && col < n){
+                float max_val = in[row * n];
+                for(int i = 1; i < n; i++){
+                        max_val = max(max_val, in[row * n + i]);
+                }
+                float divisor = 0.0f;
+                for(int i = 0; i < n; i++){
+                        divisor += exp(in[row * n + i] - max_val);
+                }
+                out[row * n + col] = exp(in[row * n + col] - max_val) / divisor;
+        }
+}
+
+template<typename T>
+void softmaxCall(const Tensor<T>& in, Tensor<T>& out){
+	const size_t m = in.shape()[0];
+	const size_t n = in.shape()[1];
+
+	dim3 tpb(16, 16);
+	dim3 bpg((tpb.x + n - 1) / tpb.x, (tpb.y + m - 1) / tpb.y);
+
+	softmax<<<bpg, tpb>>>(in.device_data(), out.device_data(), m, n);
+	cudaError_t err = cudaGetLastError();
+	if(err != cudaSuccess){
+		throw std::runtime_error("softmax kernel failed.");
+	}
+}
