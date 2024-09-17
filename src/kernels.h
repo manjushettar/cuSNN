@@ -84,3 +84,34 @@ __global__ void softmax(const T* in, T* out , const size_t m, const size_t n);
 
 template<typename T>
 void softmaxCall(const Tensor<T>& in, Tensor<T>& out);
+
+template<typename T>
+__global__ void ce_loss(const T* in, const T* labels, T* out, const size_t m, const size_t n);
+
+template<typename T>
+void crossEntropyLoss(const Tensor<T>& in, const Tensor<T> &labels, Tensor<T>& out);
+
+template<typename T>
+__global__ void ce_lossBackward(const T* in, const T* labels, T* out, const size_t m, const size_t n);
+
+template<typename T>
+void crossEntropyLossBackward(const Tensor<T>& in, const Tensor<T>& labels, Tensor<T>& out);
+
+template<typename T>
+__global__ void relu_backward(const T* in, T* out, const size_t m, const size_t n);
+
+template<typename T>
+void reluBackward(const Tensor<T>& in, Tensor<T>& out);
+
+template<typename T>
+__global__ void softmax_backward(const T* in, T* out, const size_t m, const size_t n);
+
+template<typename T>
+void softmaxBackward(const Tensor<T>& in, Tensor<T>& out);
+
+template<typename T>
+__global__ void backward(const T* in, const T* weights, const T* bias, T* grad_in, T* grad_weights, T* grad_bias, const size_t m, const size_t n);
+
+template<typename T>
+void backwardPass(const Tensor<float>& in, const Tensor<float>& weights, const Tensor<float>& bias,
+                  Tensor<float>& grad_in, Tensor<float>& grad_weights, Tensor<float>& grad_bias); 

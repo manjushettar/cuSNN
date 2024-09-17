@@ -416,3 +416,118 @@ void softmaxCall(const Tensor<T>& in, Tensor<T>& out){
 		throw std::runtime_error("softmax kernel failed.");
 	}
 }
+
+
+
+template<typename T>
+__global__ void ce_loss(const T* in, const T* labels, T* out, const size_t m, const size_t n){
+	size_t row = threadIdx.y + blockDim.y * blockIdx.y;
+	if(row < m){
+		float loss = 0.f;
+ 		for(int i = 0; i < n; i++){
+			float prob = max(1e-6f, in[row * n + i]);
+			loss -= labels[row * n + i] * logf(prob);
+		}
+		out[row] = loss;	
+	}
+}
+
+template<typename T>
+void crossEntropyLoss(const Tensor<T>& in, const Tensor<T> &labels, Tensor<T>& out){
+	// labels -> in.shape()[0] * in.shape()[1]
+	const size_t m = in.shape()[0];
+	const size_t n = in.shape()[1];
+
+	dim3 tpb(16, 16);
+	dim3 bpg( (tpb.x + n - 1) / tpb.x, (tpb.y + m - 1) / tpb.y);
+
+	ce_loss<<<bpg, tpb>>>(in.device_data(), labels.device_data(), out.device_data(), m, n);
+	cudaError_t err = cudaGetLastError();
+	if(err != cudaSuccess){
+		throw std::runtime_error("cross entropy loss kernel failed.");
+	}
+
+}
+
+
+template<typename T>
+__global__ void ce_lossBackward(const T* in, const T* labels, T* out, const size_t m, const size_t n){
+	int col = threadIdx.x + blockDim.x * blockIdx.x;
+	int row = threadIdx.y + blockDim.y * blockIdx.y;
+
+	if(row < m && col < n){
+		out[row * n + col] = in[row * n + col] - labels[row * n + col];
+	}
+}
+
+template<typename T>
+void crossEntropyLossBackward(const Tensor<T>& in, const Tensor<T>& labels, Tensor<T>& out){
+	const size_t m = in.shape()[0];
+	const size_t n = in.shape()[1];
+
+	dim3 tpb(16, 16);
+	dim3 bpg( (tpb.x + n - 1) / tpb.x, (tpb.y + m - 1) / tpb.y);
+
+	ce_lossBackward<<<bpg, tpb>>>(in.device_data(), labels.device_data(), out.device_data(), m, n);
+	cudaError_t err = cudaGetLastError();
+        if(err != cudaSuccess){
+                throw std::runtime_error("cross entropy loss backward kernel failed.");
+        }	
+}
+template<typename T>
+__global__ void relu_backward(const T* in, T* out, const size_t m, const size_t n);
+
+template<typename T>
+void reluBackward(const Tensor<T>& in, Tensor<T>& out);
+
+template<typename T>
+__global__ void softmax_backward(const T* in, T* out, const size_t m, const size_t n);
+
+template<typename T>
+void softmaxBackward(const Tensor<T>& in, Tensor<T>& out);
+
+template<typename T>
+__global__ void backward(const T* in, const T* weights, const T* bias, T* grad_in, T* grad_weights, T* grad_bias, const size_t m, const size_t n){
+        size_t row = threadIdx.y + blockDim.y * blockIdx.y;
+        size_t col = threadIdx.x + blockDim.x * blockIdx.x;
+
+        if(row < m && col < n){
+                T grad_w = 0.0f;
+                for(int i = 0; i < n; i++){
+                        grad_w += in[row * n + i] * grad_in[i * m + col];
+                }
+                grad_weights[row * n + col] = grad_w;
+
+                T grad_b = 0.0f;
+                if(col < n){
+                        grad_b += grad_in[row * n + col];
+                        grad_bias[col] = grad_b;
+                }
+
+                T grad_x = 0.0f;
+                for(int i = 0; i < n; i++){
+                        grad_x += weights[i * m + col] * grad_in[row * n + i];
+                }
+                grad_in[row * n + col] = grad_x;
+        }
+}
+
+
+template<typename T>
+void backwardPass(const Tensor<float>& in, const Tensor<float>& weights, const Tensor<float>& bias,
+                  Tensor<float>& grad_in, Tensor<float>& grad_weights, Tensor<float>& grad_bias) {
+    const size_t m = in.shape()[0];
+    const size_t n = in.shape()[1];
+
+    dim3 tpb(16, 16);
+    dim3 bpg((n + tpb.x - 1) / tpb.x, (m + tpb.y - 1) / tpb.y);
+
+    backward<<<bpg, tpb>>>(in.data(), weights.data(), bias.data(),
+                           grad_in.data(), grad_weights.data(), grad_bias.data(),
+                           m, n);
+
+    cudaError_t err = cudaGetLastError();
+    if(err != cudaSuccess) {
+        throw std::runtime_error("backward kernel failed.");
+    }
+}

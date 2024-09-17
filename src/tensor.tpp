@@ -447,7 +447,7 @@ Tensor<T> Tensor<T>::forwardPass(const Tensor<T>& in, const Tensor<T>& weights, 
 	bias_m = bias.shape()[0];
 
 	if(in_k != weights_k) throw std::runtime_error("bad forward in/weights");
-	if(bias_m != in_m) throw std::runtime_error("bad forward bias");
+	if(bias_m != weights_n) throw std::runtime_error("bad forward bias");
 	
 	Tensor<T> result({in_m, weights_n});
 	if(in.device_data_ && weights.device_data_ && bias.device_data_){
@@ -490,6 +490,32 @@ Tensor<T> Tensor<T>::tanh(const Tensor<T>& in){
 	}
 	return result;
 }
+
+template<typename T>
+Tensor<T> Tensor<T>::ceLoss(const Tensor<T>& in, const Tensor<T>& labels){
+	Tensor<T> result({labels.shape()[0], 1});
+	if(in.device_data_ && labels.device_data_){
+		crossEntropyLoss(in, labels, result);
+		cudaDeviceSynchronize();
+		cudaMemcpy(result.host_data_, result.device_data_, result.shape()[0] * sizeof(T), cudaMemcpyDeviceToHost);
+	}
+	return result;
+}
+
+template<typename T>
+void backward(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, 
+              const Tensor<T>& labels, Tensor<T>& grad_weights, Tensor<T>& grad_bias, Tensor<T>& grad_in) {
+    Tensor<T> grad_out({in.shape()[0], weights.shape()[1]});
+    crossEntropyLossBackward(in, labels, grad_out); // Gradients w.r.t. the outputs of the layer
+
+    dim3 tpb(16, 16);
+    dim3 bpg((weights.shape()[1] + tpb.x - 1) / tpb.x, (weights.shape()[0] + tpb.y - 1) / tpb.y);
+    backwardPass<<<bpg, tpb>>>(in.device_data_, weights.device_data_, bias.device_data_, grad_out.device_data_, grad_in.device_data_, grad_weights.device_data_);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(grad_bias.device_data_, grad_out.device_data_, grad_bias.size() * sizeof(T), cudaMemcpyDeviceToDevice);
+}
+
 
 template class Tensor<float>;
 
