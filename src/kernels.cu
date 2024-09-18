@@ -474,17 +474,58 @@ void crossEntropyLossBackward(const Tensor<T>& in, const Tensor<T>& labels, Tens
                 throw std::runtime_error("cross entropy loss backward kernel failed.");
         }	
 }
-template<typename T>
-__global__ void relu_backward(const T* in, T* out, const size_t m, const size_t n);
 
 template<typename T>
-void reluBackward(const Tensor<T>& in, Tensor<T>& out);
+__global__ void relu_backward(const T* in, const T* grad_out, T* grad_in, const size_t m, const size_t n) {
+    	size_t row = threadIdx.y + blockDim.y * blockIdx.y;
+    	size_t col = threadIdx.x + blockDim.x * blockIdx.x;
+	    if (row < m && col < n) {
+        	grad_in[row * n + col] = (in[row * n + col] > 0) ? grad_out[row * n + col] : 0;
+    	}
+}
 
 template<typename T>
-__global__ void softmax_backward(const T* in, T* out, const size_t m, const size_t n);
+void reluBackward(const Tensor<T>& in, const Tensor<T>& grad_out, Tensor<T>&grad_in){
+	const size_t m = in.shape()[0];
+    	const size_t n = in.shape()[1];
+
+    	dim3 tpb(16, 16);
+    	dim3 bpg((n + tpb.x - 1) / tpb.x, (m + tpb.y - 1) / tpb.y);
+
+    	relu_backward<<<bpg, tpb>>>(in.data(), grad_out.data(), grad_in.data(), m, n);
+
+    	cudaError_t err = cudaGetLastError();
+    	if (err != cudaSuccess) {
+        	throw std::runtime_error("ReLU backward kernel failed.");
+    	}
+}
+
 
 template<typename T>
-void softmaxBackward(const Tensor<T>& in, Tensor<T>& out);
+__global__ void softmax_backward(const T* softmax_out, const T* labels, T* grad_in, const size_t m, const size_t n){
+	size_t row = threadIdx.y + blockDim.y * blockIdx.y;
+    	size_t col = threadIdx.x + blockDim.x * blockIdx.x;
+
+    	if (row < m && col < n) {
+        	grad_in[row * n + col] = softmax_out[row * n + col] - labels[row * n + col];
+    	}
+}
+
+template<typename T>
+void softmaxBackward(const Tensor<T>& softmax_out, const Tensor<T>& labels, Tensor<T>& grad_in){
+	const size_t m = softmax_out.shape()[0];
+	const size_t n = softmax_out.shape()[1];
+
+    	dim3 tpb(16, 16);
+    	dim3 bpg((n + tpb.x - 1) / tpb.x, (m + tpb.y - 1) / tpb.y);
+
+    	softmax_backward<<<bpg, tpb>>>(softmax_out.data(), labels.data(), grad_in.data(), m, n);
+
+    	cudaError_t err = cudaGetLastError();
+  	  if (err != cudaSuccess) {
+       		throw std::runtime_error("Softmax backward kernel failed.");
+    	}
+}
 
 template<typename T>
 __global__ void backward(const T* in, const T* weights, const T* bias, T* grad_in, T* grad_weights, T* grad_bias, const size_t m, const size_t n){
@@ -514,20 +555,26 @@ __global__ void backward(const T* in, const T* weights, const T* bias, T* grad_i
 
 
 template<typename T>
-void backwardPass(const Tensor<float>& in, const Tensor<float>& weights, const Tensor<float>& bias,
-                  Tensor<float>& grad_in, Tensor<float>& grad_weights, Tensor<float>& grad_bias) {
-    const size_t m = in.shape()[0];
-    const size_t n = in.shape()[1];
+void backwardPass(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias,const Tensor<T>& labels, Tensor<T>& d_in, Tensor<T>& d_weights, Tensor<T>& d_bias) {
+    	
+	Tensor<T> softmax_out = in;
+	Tensor<T> d_softmax({in.shape()[0], in.shape()[1]});
 
-    dim3 tpb(16, 16);
-    dim3 bpg((n + tpb.x - 1) / tpb.x, (m + tpb.y - 1) / tpb.y);
+	softmaxBackward(softmax_out, labels, d_softmax);
 
-    backward<<<bpg, tpb>>>(in.data(), weights.data(), bias.data(),
-                           grad_in.data(), grad_weights.data(), grad_bias.data(),
-                           m, n);
+	Tensor<T> d_relu({in.shape()[0], in.shape()[1]});
+	reluBackward(in, d_softmax, d_relu);
+	
+	const size_t m = in.shape()[0];
+	const size_t n = in.shape()[1];
+	
+	dim3 tpb(16, 16);
+   	dim3 bpg((n + tpb.x - 1) / tpb.x, (m + tpb.y - 1) / tpb.y);
 
-    cudaError_t err = cudaGetLastError();
-    if(err != cudaSuccess) {
-        throw std::runtime_error("backward kernel failed.");
-    }
+    	backward<<<bpg, tpb>>>(in.device_data(), weights.device_data(), bias.device_data(), d_in.device_data(), d_weights.device_data(), d_bias.device_data(),m, n);
+
+    	cudaError_t err = cudaGetLastError();
+    	if(err != cudaSuccess) {
+        	throw std::runtime_error("backward kernel failed.");
+    	}
 }

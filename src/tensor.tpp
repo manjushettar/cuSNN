@@ -55,6 +55,7 @@ Tensor<T>& Tensor<T>::operator=(Tensor&& other) noexcept{
 		other.host_data_ = nullptr;
 		other.device_data_ = nullptr;
 		other.size_ = 0;
+	
 	}	
 	return *this;
 }
@@ -69,6 +70,7 @@ void Tensor<T>::allocateMemory(){
 	host_data_ = new T[size_];
 	cudaError_t err = cudaMalloc(&device_data_, size_ * sizeof(T));
 	if(err != cudaSuccess){
+		std::cerr << "Failed to allocate device mem: " << cudaGetErrorString(err);	
 		throw std::runtime_error("Failed to allocate device memory");
 	}
 }
@@ -503,17 +505,17 @@ Tensor<T> Tensor<T>::ceLoss(const Tensor<T>& in, const Tensor<T>& labels){
 }
 
 template<typename T>
-void backward(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, 
-              const Tensor<T>& labels, Tensor<T>& grad_weights, Tensor<T>& grad_bias, Tensor<T>& grad_in) {
-    Tensor<T> grad_out({in.shape()[0], weights.shape()[1]});
-    crossEntropyLossBackward(in, labels, grad_out); // Gradients w.r.t. the outputs of the layer
+void Tensor<T>::backward(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, const Tensor<T>& labels, Tensor<T>& grad_weights, Tensor<T>& grad_bias, Tensor<T>& grad_in) {
+    	Tensor<T> grad_out({in.shape()[0], weights.shape()[1]});
+    	crossEntropyLossBackward(in, labels, grad_out);
 
-    dim3 tpb(16, 16);
-    dim3 bpg((weights.shape()[1] + tpb.x - 1) / tpb.x, (weights.shape()[0] + tpb.y - 1) / tpb.y);
-    backwardPass<<<bpg, tpb>>>(in.device_data_, weights.device_data_, bias.device_data_, grad_out.device_data_, grad_in.device_data_, grad_weights.device_data_);
-    cudaDeviceSynchronize();
+	cudaDeviceSynchronize();
 
-    cudaMemcpy(grad_bias.device_data_, grad_out.device_data_, grad_bias.size() * sizeof(T), cudaMemcpyDeviceToDevice);
+
+	dim3 tpb(16, 16);
+   	dim3 bpg((weights.shape()[1] + tpb.x - 1) / tpb.x, (weights.shape()[0] + tpb.y - 1) / tpb.y);
+	backwardPass(in, weights, bias, grad_out, grad_in, grad_weights, grad_bias);
+	cudaDeviceSynchronize();
 }
 
 

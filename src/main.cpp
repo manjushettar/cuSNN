@@ -23,24 +23,12 @@ int main(){
 		Tensor<float> weights = Tensor<float>::randn({784, 128});
 		Tensor<float> biases = Tensor<float>::randn({128,1});
 
-	//	Tensor<float> res = Tensor<float>::forwardPass(in, weights, biases);
-	//	res = Tensor<float>::tanh(res);
-		
-		// layer 2 
-	//	Tensor<float> in2 = res;
 		Tensor<float> weights2 = Tensor<float>::randn({128, 256});
 		Tensor<float> bias2 = Tensor<float>::randn({256, 1});
 
-		//res = Tensor<float>::forwardPass(in2, weights2, bias2);
-		//res = Tensor<float>::tanh(res);
 
-		// layer 3
-	//	Tensor<float> in3 = res;
 		Tensor<float> weights3 = Tensor<float>::randn({256, 10});
 		Tensor<float> bias3 = Tensor<float>::randn({10, 1});
-		
-		//res = Tensor<float>::forwardPass(in3, weights3, bias3);
-		//res = Tensor<float>::softmax(res);
 		
 		Tensor<float> res({16, 128});
 
@@ -48,8 +36,20 @@ int main(){
 		rand_labels(labels);
 		labels.toDevice();	
 		Tensor<float> loss({16, 1});
+		
+		Tensor<float> grad_weights({784, 128});
+		Tensor<float> grad_biases({128, 1});
 
-		int EPOCHS = 1;
+		Tensor<float> grad_weights2({128, 256});
+		Tensor<float> grad_bias2({256, 1});
+
+		Tensor<float> grad_weights3({256, 10});
+		Tensor<float> grad_bias3({10, 1});
+
+		Tensor<float> grad_in({16, 784});
+
+		float learning_rate = 0.001;
+		int EPOCHS = 5;
 		for(int i = 0; i < EPOCHS; i++){
 			res = Tensor<float>::forwardPass(in, weights, biases);
                 	res = Tensor<float>::relu(res);
@@ -61,6 +61,27 @@ int main(){
 			res = Tensor<float>::softmax(res);
 
 			loss = Tensor<float>::ceLoss(res, labels);
+			loss.toHost();
+			float lossVal = 0.f;
+			for(int i = 0; i < 16; i++){
+				lossVal += loss[i];
+			}
+			lossVal = lossVal / 16.0;
+			loss.toDevice();
+			res.backward(res, weights3, bias3, labels, grad_weights3, grad_bias3, grad_in);
+			res.backward(grad_in, weights2, bias2, labels, grad_weights2, grad_bias2, grad_in);
+			res.backward(grad_in, weights, biases, labels, grad_weights, grad_biases, grad_in);
+			
+			weights = weights - grad_weights * learning_rate;
+			biases = biases - grad_biases * learning_rate;
+
+			weights2 = weights2 - grad_weights2 * learning_rate;
+			bias2 = bias2 - grad_bias2 * learning_rate;
+
+			weights3 = weights3 - grad_weights3 * learning_rate;
+			bias3 = bias3 - grad_bias3 * learning_rate;
+
+			std::cout << "Epoch: " << i << " Loss: " << lossVal << std::endl;
 		}
 				
 		std::cout << loss << std::endl;

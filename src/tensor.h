@@ -72,7 +72,6 @@ public:
 	static Tensor<T> reluBackward(const Tensor<T>& in);
 	
 	void backward(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, const Tensor<T>& labels, Tensor<T>& grad_weights, Tensor<T>& grad_bias, Tensor<T>& grad_in);
-	
 	static Tensor<T> randn(const std::vector<size_t>& shape);	
 
 private:
