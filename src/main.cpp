@@ -61,27 +61,22 @@ int main(){
 			res = Tensor<float>::softmax(res);
 
 			loss = Tensor<float>::ceLoss(res, labels);
-			loss.toHost();
-			float lossVal = 0.f;
-			for(int i = 0; i < 16; i++){
-				lossVal += loss[i];
-			}
-			lossVal = lossVal / 16.0;
-			loss.toDevice();
 			res.backward(res, weights3, bias3, labels, grad_weights3, grad_bias3, grad_in);
+			std::cout << "grad_in shape: " << grad_in.shape()[0] << ", " << grad_in.shape()[1] << std::endl;
 			res.backward(grad_in, weights2, bias2, labels, grad_weights2, grad_bias2, grad_in);
+			std::cout << "grad_in shape: " << grad_in.shape()[0] << ", " << grad_in.shape()[1] << std::endl;
 			res.backward(grad_in, weights, biases, labels, grad_weights, grad_biases, grad_in);
-			
-			weights = weights - grad_weights * learning_rate;
-			biases = biases - grad_biases * learning_rate;
+			std::cout << "test 1" << std::endl;
+			//weights = weights - grad_weights * learning_rate;
+			//biases = biases - grad_biases * learning_rate;
 
-			weights2 = weights2 - grad_weights2 * learning_rate;
-			bias2 = bias2 - grad_bias2 * learning_rate;
+			//weights2 = weights2 - grad_weights2 * learning_rate;
+			//bias2 = bias2 - grad_bias2 * learning_rate;
 
-			weights3 = weights3 - grad_weights3 * learning_rate;
-			bias3 = bias3 - grad_bias3 * learning_rate;
+			//weights3 = weights3 - grad_weights3 * learning_rate;
+			//bias3 = bias3 - grad_bias3 * learning_rate;
 
-			std::cout << "Epoch: " << i << " Loss: " << lossVal << std::endl;
+			std::cout << "Epoch: " << i << " Loss: " << loss << std::endl;
 		}
 				
 		std::cout << loss << std::endl;

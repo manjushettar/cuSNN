@@ -508,14 +508,17 @@ template<typename T>
 void Tensor<T>::backward(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, const Tensor<T>& labels, Tensor<T>& grad_weights, Tensor<T>& grad_bias, Tensor<T>& grad_in) {
     	Tensor<T> grad_out({in.shape()[0], weights.shape()[1]});
     	crossEntropyLossBackward(in, labels, grad_out);
-
+	
 	cudaDeviceSynchronize();
-
 
 	dim3 tpb(16, 16);
    	dim3 bpg((weights.shape()[1] + tpb.x - 1) / tpb.x, (weights.shape()[0] + tpb.y - 1) / tpb.y);
 	backwardPass(in, weights, bias, grad_out, grad_in, grad_weights, grad_bias);
 	cudaDeviceSynchronize();
+
+	cudaMemcpy(grad_weights.host_data_, grad_weights.device_data_, grad_weights.shape()[0] * grad_weights.shape()[1] * sizeof(T), cudaMemcpyDeviceToHost);
+	cudaMemcpy(grad_bias.host_data_, grad_bias.device_data_, grad_bias.shape()[0] * grad_bias.shape()[1] * sizeof(T), cudaMemcpyDeviceToHost);
+	cudaMemcpy(grad_in.host_data_, grad_in.device_data_, grad_in.shape()[0] * grad_in.shape()[1] * sizeof(T), cudaMemcpyDeviceToHost);
 }
 
 
