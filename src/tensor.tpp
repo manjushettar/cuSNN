@@ -561,7 +561,7 @@ Tensor<T> Tensor<T>::randn(const std::vector<size_t>& shape){
 	Tensor<T> result(shape);
 	fillRandom(result, result.size());
 	cudaDeviceSynchronize();
-	cudaMemcpy(result.data_, result.device_data_, result.size() * sizeof(T), cudaMemcpyDeviceToHost);
+	cudaMemcpy(result.host_data_, result.device_data_, result.size() * sizeof(T), cudaMemcpyDeviceToHost);
 	return result;
 } 
 
@@ -658,6 +658,23 @@ Tensor<T> Tensor<T>::ceLoss(const Tensor<T>& in, const Tensor<T>& labels){
 	return result;
 }
 
+template<typename T>
+Tensor<T> Tensor<T>::ceBackward(const Tensor<T>& in, const Tensor<T>& labels){
+	Tensor<T> result({in.shape()[0], in.shape()[1]});
+	crossEntropyLossBackward(in, labels, result);
+	cudaDeviceSynchronize();
+	return result;
+}
+
+template<typename T>
+Tensor<T> Tensor<T>::reluBackward(const Tensor<T>& in, const Tensor<T>& grad_out){
+	Tensor<T> result({in.shape()[0], in.shape()[1]});
+	reluBackwardCall(in, grad_out, result);
+	cudaDeviceSynchronize();
+	std::cout << "RELU BACKWARD finished." << std::endl;
+	return result; 	
+}
+
 // performs a backward pass on the tensor
 // Usage:
 // Tensor<float> in({2, 3});
@@ -666,20 +683,19 @@ Tensor<T> Tensor<T>::ceLoss(const Tensor<T>& in, const Tensor<T>& labels){
 // Tensor<float> labels({2, 3});
 // in.backward(weights, bias, labels, grad_weights, grad_bias, grad_in); -> {2, 3}
 template<typename T>
-void Tensor<T>::backward(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, const Tensor<T>& labels, Tensor<T>& grad_weights, Tensor<T>& grad_bias, Tensor<T>& grad_in) {
-	Tensor<T> grad_out({in.shape()[0], weights.shape()[1]});
-	crossEntropyLossBackward(in, labels, grad_out);
-	
-	cudaDeviceSynchronize();
-
+void Tensor<T>::backward(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, const Tensor<T>& grad_out, Tensor<T>& grad_weights, Tensor<T>& grad_bias, Tensor<T>& grad_in) {
 	dim3 tpb(16, 16);
    	dim3 bpg((weights.shape()[1] + tpb.x - 1) / tpb.x, (weights.shape()[0] + tpb.y - 1) / tpb.y);
 	backwardPass(in, weights, bias, grad_out, grad_in, grad_weights, grad_bias);
 	cudaDeviceSynchronize();
 
+	std::cout << "Backward finished." << std::endl;
+
 	cudaMemcpy(grad_weights.host_data_, grad_weights.device_data_, grad_weights.shape()[0] * grad_weights.shape()[1] * sizeof(T), cudaMemcpyDeviceToHost);
 	cudaMemcpy(grad_bias.host_data_, grad_bias.device_data_, grad_bias.shape()[0] * grad_bias.shape()[1] * sizeof(T), cudaMemcpyDeviceToHost);
 	cudaMemcpy(grad_in.host_data_, grad_in.device_data_, grad_in.shape()[0] * grad_in.shape()[1] * sizeof(T), cudaMemcpyDeviceToHost);
+	
+	std::cout << "Grad weights udpated." << std::endl;	
 }
 
 

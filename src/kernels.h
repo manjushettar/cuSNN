@@ -101,7 +101,7 @@ template<typename T>
 __global__ void relu_backward(const T* in, T* out, const size_t m, const size_t n);
 
 template<typename T>
-void reluBackward(const Tensor<T>& in, Tensor<T>& out);
+void reluBackwardCall(const Tensor<T>& in, const Tensor<T>& grad_out, Tensor<T>&grad_in);
 
 template<typename T>
 __global__ void softmax_backward(const T* in, T* out, const size_t m, const size_t n);
@@ -110,7 +110,7 @@ template<typename T>
 void softmaxBackward(const Tensor<T>& in, Tensor<T>& out);
 
 template<typename T>
-__global__ void backward(const T* in, const T* weights, const T* bias, T* grad_in, T* grad_weights, T* grad_bias, const size_t m, const size_t n);
+__global__ void backward(const T* in, const T* weights, const T* bias, T* grad_in, T* grad_weights, T* grad_bias, const size_t m, const size_t n, const size_t k);
 
 template<typename T>
 void backwardPass(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, const Tensor<T>& labels, Tensor<T>& grad_in, Tensor<T>& grad_weights, Tensor<T>& grad_bias); 

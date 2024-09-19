@@ -485,7 +485,7 @@ __global__ void relu_backward(const T* in, const T* grad_out, T* grad_in, const 
 }
 
 template<typename T>
-void reluBackward(const Tensor<T>& in, const Tensor<T>& grad_out, Tensor<T>&grad_in){
+void reluBackwardCall(const Tensor<T>& in, const Tensor<T>& grad_out, Tensor<T>&grad_in){
 	const size_t m = in.shape()[0];
     	const size_t n = in.shape()[1];
 
@@ -528,26 +528,28 @@ void softmaxBackward(const Tensor<T>& softmax_out, const Tensor<T>& labels, Tens
 }
 
 template<typename T>
-__global__ void backward(const T* in, const T* weights, const T* bias, T* grad_in, T* grad_weights, T* grad_bias, const size_t m, const size_t n){
-        size_t row = threadIdx.y + blockDim.y * blockIdx.y;
+__global__ void backward(const T* in, const T* weights, const T* bias, const T* grad_out, T* grad_in, T* grad_weights, T* grad_bias, const size_t m, const size_t n, const size_t k){
+	size_t row = threadIdx.y + blockDim.y * blockIdx.y;
         size_t col = threadIdx.x + blockDim.x * blockIdx.x;
 
-        if(row < m && col < n){
+        if(row < m && col < k){
                 T grad_w = 0.0f;
                 for(int i = 0; i < n; i++){
-                        grad_w += in[row * n + i] * grad_in[i * m + col];
+                        grad_w += in[row * n + i] * grad_in[row * k + col];
                 }
-                grad_weights[row * n + col] = grad_w;
-
-                T grad_b = 0.0f;
-                if(col < n){
-                        grad_b += grad_in[row * n + col];
-                        grad_bias[col] = grad_b;
-                }
+                grad_weights[row * k + col] = grad_w;
+		
+		if(row == 0){
+                	T grad_b = 0.0f;
+         		for(int i = 0; i < m; i++){
+				grad_b += grad_out[i * k + col];
+			}
+			grad_bias[col] = grad_b;
+		}
 
                 T grad_x = 0.0f;
-                for(int i = 0; i < n; i++){
-                        grad_x += weights[i * m + col] * grad_in[row * n + i];
+                for(int i = 0; i < k; i++){
+                        grad_x += weights[col * k + i] * grad_in[row * k + i];
                 }
                 grad_in[row * n + col] = grad_x;
         }
@@ -555,26 +557,18 @@ __global__ void backward(const T* in, const T* weights, const T* bias, T* grad_i
 
 
 template<typename T>
-void backwardPass(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias,const Tensor<T>& labels, Tensor<T>& d_in, Tensor<T>& d_weights, Tensor<T>& d_bias) {
-    	
-	Tensor<T> softmax_out = in;
-	Tensor<T> d_softmax({in.shape()[0], in.shape()[1]});
-
-	softmaxBackward(softmax_out, labels, d_softmax);
-
-	Tensor<T> d_relu({in.shape()[0], in.shape()[1]});
-	reluBackward(in, d_softmax, d_relu);
-	
+void backwardPass(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias,const Tensor<T>& grad_out, Tensor<T>& d_in, Tensor<T>& d_weights, Tensor<T>& d_bias) {
 	const size_t m = in.shape()[0];
 	const size_t n = in.shape()[1];
-	
+	const size_t k = weights.shape()[1];
 	dim3 tpb(16, 16);
    	dim3 bpg((n + tpb.x - 1) / tpb.x, (m + tpb.y - 1) / tpb.y);
 
-    	backward<<<bpg, tpb>>>(in.device_data(), weights.device_data(), bias.device_data(), d_in.device_data(), d_weights.device_data(), d_bias.device_data(),m, n);
+    	backward<<<bpg, tpb>>>(in.device_data(), weights.device_data(), bias.device_data(), grad_out.device_data(), d_in.device_data(), d_weights.device_data(), d_bias.device_data(),m, n, k);
 
     	cudaError_t err = cudaGetLastError();
     	if(err != cudaSuccess) {
+		std::cerr << "Cuda error: " << cudaGetErrorString(err) << std::endl;
         	throw std::runtime_error("backward kernel failed.");
     	}
 }

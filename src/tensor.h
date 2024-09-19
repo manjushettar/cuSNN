@@ -68,10 +68,10 @@ public:
 	Tensor<T> operator/=(const float scalar);
 	
 	static Tensor<T> forwardPass(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias);
-	void backward(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, const Tensor<T>& labels, Tensor<T>& grad_weights, Tensor<T>& grad_bias, Tensor<T>& grad_in);
+	void backward(const Tensor<T>& in, const Tensor<T>& weights, const Tensor<T>& bias, const Tensor<T>& grad_out, Tensor<T>& grad_weights, Tensor<T>& grad_bias, Tensor<T>& grad_in);
 	
 	static Tensor<T> relu(const Tensor<T>& in);	
-	static Tensor<T> reluBackward(const Tensor<T>& in);
+	static Tensor<T> reluBackward(const Tensor<T>& in, const Tensor<T>& grad_out);
 	
 	static Tensor<T> softmax(const Tensor<T>& in);
 	static Tensor<T> softmaxBackward(const Tensor<T>& in);
@@ -79,7 +79,7 @@ public:
 	static Tensor<T> tanh(const Tensor<T>& in);
 
 	static Tensor<T> ceLoss(const Tensor<T>& in, const Tensor<T>& labels);
-	static Tensor<T> ceLossBackward(const Tensor<T>& in, const Tensor<T>& labels);
+	static Tensor<T> ceBackward(const Tensor<T>& in, const Tensor<T>& labels);
 	
 	static Tensor<T> randn(const std::vector<size_t>& shape);	
 
